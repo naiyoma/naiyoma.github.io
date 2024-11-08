@@ -1,33 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin P2SH Transaction Creation Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
 
-## Step-by-Step Guide
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
 
-### 1. Create the Wallets
+        h2 {
+            color: #2c3e50;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
 
-First, we'll create two wallets: one main wallet and one watch-only wallet.
+        h3 {
+            color: #34495e;
+            margin-top: 25px;
+        }
 
-```bash
-# Create main wallet
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+            position: relative;
+        }
+
+        code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 14px;
+            color: #24292e;
+        }
+
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .important {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        ul, ol {
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Creating P2SH (Pay-to-Script-Hash) Transactions in Bitcoin</h1>
+        
+        <p>This guide demonstrates how to create P2SH transactions using Bitcoin Core's CLI interface in regtest mode. We'll create a 2-of-3 multisig P2SH transaction.</p>
+
+        <h2>Step-by-Step Guide</h2>
+
+        <pre><code># Create main wallet
 bitcoin-cli -regtest createwallet "wallet1"
 
 # Create watch-only wallet
-bitcoin-cli -regtest createwallet "watch_only_wallet" true true "" false
-```
+bitcoin-cli -regtest createwallet "watch_only_wallet" true true "" false</code></pre>
 
-### 2. Generate Initial Coins
+        
+        <p>Generate some blocks to get initial coins in regtest mode:</p>
+        <pre><code>bitcoin-cli -regtest -rpcwallet=wallet1 generatetoaddress 101 \
+    "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"</code></pre>
 
-Generate some blocks to get initial coins in regtest mode:
-
-```bash
-bitcoin-cli -regtest -rpcwallet=wallet1 generatetoaddress 101 \
-  "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"
-```
-
-### 3. Set Up Multisig Public Keys
-
-Generate three addresses and get their public keys:
-
-```bash
-# First key pair
+        <h3>3. Set Up Multisig Public Keys</h3>
+        <p>Generate three addresses and get their public keys:</p>
+        <pre><code># First key pair
 ADDR1=$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)
 PUBKEY1=$(bitcoin-cli -regtest -rpcwallet=wallet1 getaddressinfo "$ADDR1" | jq -r '.pubkey')
 
@@ -37,29 +112,17 @@ PUBKEY2=$(bitcoin-cli -regtest -rpcwallet=wallet1 getaddressinfo "$ADDR2" | jq -
 
 # Third key pair
 ADDR3=$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)
-PUBKEY3=$(bitcoin-cli -regtest -rpcwallet=wallet1 getaddressinfo "$ADDR3" | jq -r '.pubkey')
-```
+PUBKEY3=$(bitcoin-cli -regtest -rpcwallet=wallet1 getaddressinfo "$ADDR3" | jq -r '.pubkey')</code></pre>
 
-### 4. Create and Import the Descriptor
-
-Create a P2SH multisig descriptor and import it to the watch-only wallet:
-
-```bash
-# Create descriptor
+        
+        <pre><code># Create descriptor
 DESC_NO_CHECKSUM="sh(multi(2,$PUBKEY1,$PUBKEY2,$PUBKEY3))"
 DESC_WITH_CHECKSUM=$(bitcoin-cli -regtest getdescriptorinfo "$DESC_NO_CHECKSUM" | jq -r '.descriptor')
 
 # Import to watch-only wallet
 bitcoin-cli -regtest -rpcwallet=watch_only_wallet importdescriptors \
-  '[{"desc": "'"$DESC_WITH_CHECKSUM"'", "timestamp": "now", "internal": false, "watchonly": true}]'
-```
-
-### 5. Fund the P2SH Address
-
-Get the P2SH address and send funds to it:
-
-```bash
-# Get P2SH address
+    '[{"desc": "'"$DESC_WITH_CHECKSUM"'", "timestamp": "now", "internal": false, "watchonly": true}]'</code></pre>
+        <pre><code># Get P2SH address
 P2SH_MULTISIG=$(bitcoin-cli -regtest deriveaddresses "$DESC_WITH_CHECKSUM" | jq -r '.[0]')
 
 # Send 1 BTC to the P2SH address
@@ -67,15 +130,10 @@ bitcoin-cli -regtest -rpcwallet=wallet1 sendtoaddress "$P2SH_MULTISIG" 1
 
 # Generate a block to confirm the funding transaction
 bitcoin-cli -regtest generatetoaddress 1 \
-  "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"
-```
+    "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"</code></pre>
 
-### 6. Create the Spending Transaction
-
-Now we'll create a transaction that spends from the P2SH address:
-
-```bash
-# Create P2SH destination address
+        <h3>6. Create the Spending Transaction</h3>
+        <pre><code># Create P2SH destination address
 DEST_ADDR=$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress "" "p2sh-segwit")
 
 # Create P2SH change address
@@ -88,18 +146,12 @@ VOUT=$(echo $UTXO | jq -r '.vout')
 
 # Create the PSBT
 PSBT=$(bitcoin-cli -regtest -rpcwallet=watch_only_wallet walletcreatefundedpsbt \
-  "[{\"txid\":\"$TXID\",\"vout\":$VOUT}]" \
-  "[{\"$DEST_ADDR\":0.9999}]" \
-  0 \
-  "{\"includeWatching\":true, \"changeAddress\":\"$CHANGE_ADDR\"}" | jq -r '.psbt')
-```
+    "[{\"txid\":\"$TXID\",\"vout\":$VOUT}]" \
+    "[{\"$DEST_ADDR\":0.9999}]" \
+    0 \
+    "{\"includeWatching\":true, \"changeAddress\":\"$CHANGE_ADDR\"}" | jq -r '.psbt')</code></pre>
 
-### 7. Sign and Broadcast the Transaction
-
-Finally, sign the PSBT and broadcast the transaction:
-
-```bash
-# Sign the PSBT
+        <pre><code># Sign the PSBT
 SIGNED_PSBT=$(bitcoin-cli -regtest -rpcwallet=wallet1 walletprocesspsbt "$PSBT" | jq -r '.psbt')
 
 # Finalize the PSBT
@@ -110,34 +162,9 @@ TXID=$(bitcoin-cli -regtest sendrawtransaction "$FINAL_TX")
 
 # Generate a block to confirm the transaction
 bitcoin-cli -regtest generatetoaddress 1 \
-  "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"
-```
+    "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"</code></pre>
 
-### 8. Verify the Transaction
-
-You can examine the final transaction:
-
-```bash
-bitcoin-cli -regtest getrawtransaction "$TXID" true
-```
-
-In the transaction output, you should see:
-- The input containing a `scriptSig` with signatures and the redeem script
-- P2SH outputs (addresses starting with "2" in regtest/testnet)
-- The proper multisig script format in the redeem script
-
-## Important Notes
-
-1. The P2SH addresses in regtest/testnet start with "2" (in mainnet they start with "3")
-2. Make sure to keep track of the redeem script, as it's required to spend from the P2SH address
-3. The watch-only wallet is used to track the P2SH address without holding private keys
-4. This example uses a 2-of-3 multisig setup, but P2SH can be used with other script types as well
-
-## Common Issues and Solutions
-
-1. If you get a "Transaction needs a change address" error, make sure to specify a proper change address
-2. If signing fails, verify that the wallet contains the necessary private keys
-3. For P2SH addresses, always ensure you have the correct redeem script
-4. Keep in mind the network fees when calculating output amounts
-
-This guide demonstrates a basic P2SH transaction setup. In production environments, additional security measures and error handling would be necessary.
+        <pre><code>bitcoin-cli -regtest getrawtransaction "$TXID" true</code></pre>
+    </div>
+</body>
+</html>
