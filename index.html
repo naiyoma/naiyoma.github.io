@@ -83,7 +83,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Creating P2SH (Pay-to-Script-Hash) Transactions in Bitcoin</h1>
+        <h1>Creating P2SH (Pay-to-Script-Hash)</h1>
         
         <p>This guide demonstrates how to create P2SH transactions using Bitcoin Core's CLI interface in regtest mode. We'll create a 2-of-3 multisig P2SH transaction.</p>
 
@@ -95,13 +95,11 @@ bitcoin-cli -regtest createwallet "wallet1"
 # Create watch-only wallet
 bitcoin-cli -regtest createwallet "watch_only_wallet" true true "" false</code></pre>
 
-        
-        <p>Generate some blocks to get initial coins in regtest mode:</p>
+
         <pre><code>bitcoin-cli -regtest -rpcwallet=wallet1 generatetoaddress 101 \
     "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"</code></pre>
 
-        <h3>3. Set Up Multisig Public Keys</h3>
-        <p>Generate three addresses and get their public keys:</p>
+        
         <pre><code># First key pair
 ADDR1=$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)
 PUBKEY1=$(bitcoin-cli -regtest -rpcwallet=wallet1 getaddressinfo "$ADDR1" | jq -r '.pubkey')
@@ -132,7 +130,7 @@ bitcoin-cli -regtest -rpcwallet=wallet1 sendtoaddress "$P2SH_MULTISIG" 1
 bitcoin-cli -regtest generatetoaddress 1 \
     "$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress)"</code></pre>
 
-        <h3>6. Create the Spending Transaction</h3>
+        
         <pre><code># Create P2SH destination address
 DEST_ADDR=$(bitcoin-cli -regtest -rpcwallet=wallet1 getnewaddress "" "p2sh-segwit")
 
@@ -166,5 +164,57 @@ bitcoin-cli -regtest generatetoaddress 1 \
 
         <pre><code>bitcoin-cli -regtest getrawtransaction "$TXID" true</code></pre>
     </div>
+
+
+        <div class="container">
+            <h1>Creating P2WSH </h1>
+    
+            <pre><code># Create wallet3
+    bitcoin-cli createwallet "wallet3"
+    
+    # Generate some blocks to get coins
+    bitcoin-cli -rpcwallet=wallet3 generatetoaddress 101 $(bitcoin-cli -rpcwallet=wallet3 getnewaddress)</code></pre>
+    
+            <pre><code># Generate three key pairs
+    KEY1=$(bitcoin-cli -rpcwallet=wallet3 getnewaddress)
+    PUBKEY1=$(bitcoin-cli -rpcwallet=wallet3 getaddressinfo $KEY1 | jq -r '.pubkey')
+    
+    KEY2=$(bitcoin-cli -rpcwallet=wallet3 getnewaddress)
+    PUBKEY2=$(bitcoin-cli -rpcwallet=wallet3 getaddressinfo $KEY2 | jq -r '.pubkey')
+    
+    KEY3=$(bitcoin-cli -rpcwallet=wallet3 getnewaddress)
+    PUBKEY3=$(bitcoin-cli -rpcwallet=wallet3 getaddressinfo $KEY3 | jq -r '.pubkey')</code></pre>
+    
+            <pre><code># Create 2-of-3 multisig P2WSH address
+    WSH_ADDRESS=$(bitcoin-cli -rpcwallet=wallet3 createmultisig 2 "[$PUBKEY1,$PUBKEY2,$PUBKEY3]" "bech32")</code></pre>
+    
+           
+            <pre><code># Send 1 BTC to the P2WSH address
+    TXID=$(bitcoin-cli -rpcwallet=wallet3 sendtoaddress $(echo $WSH_ADDRESS | jq -r '.address') 1.0)
+    
+    # Generate a block to confirm the transaction
+    bitcoin-cli -rpcwallet=wallet3 generatetoaddress 1 $(bitcoin-cli -rpcwallet=wallet3 getnewaddress)</code></pre>
+    
+            
+            <pre><code># Create raw transaction spending from P2WSH
+    RAWTX=$(bitcoin-cli -rpcwallet=wallet3 createrawtransaction \
+    '[{"txid":"'$TXID'","vout":0}]' \
+    '{"'$(bitcoin-cli -rpcwallet=wallet3 getnewaddress)'":0.99999000}')
+    
+    # Sign the transaction
+    SIGNEDTX=$(bitcoin-cli -rpcwallet=wallet3 signrawtransactionwithwallet $RAWTX)
+    
+    # Broadcast the transaction
+    SPENT_TXID=$(bitcoin-cli -rpcwallet=wallet3 sendrawtransaction $(echo $SIGNEDTX | jq -r '.hex'))</code></pre>
+    
+            <pre><code># Get full transaction details with witness data
+    bitcoin-cli getrawtransaction $SPENT_TXID true
+    
+    # View the witness stack (includes witnessScript)
+    bitcoin-cli getrawtransaction $SPENT_TXID true | jq -r '.vin[].txinwitness[]'</code></pre>
+    
+        </div>
+   
+
 </body>
 </html>
