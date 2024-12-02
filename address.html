@@ -79,163 +79,271 @@
         li {
             margin-bottom: 8px;
         }
+        .section {
+            margin: 20px 0;
+        }
+        ul {
+            list-style-type: none;
+            padding-left: 20px;
+        }
+        ul li {
+            margin: 10px 0;
+            position: relative;
+        }
+        ul li:before {
+            content: "•";
+            color: #3498db;
+            font-weight: bold;
+            position: absolute;
+            left: -15px;
+        }
+        .ordered-list {
+            list-style-type: decimal;
+            padding-left: 20px;
+        }
+        .ordered-list li {
+            margin: 10px 0;
+        }
+        .ordered-list li:before {
+            content: none;
+        }
+        .sub-list {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
 
-        <h3>P2SH</h3>
+       <div>
+        <div class="container">
+            <section class="section">
+                <h2>Current Implementation</h2>
+                <p>This is a first iteration of this script focuses on the basic mechanism of data collection, without yet implementing Tor connectivity. The script demonstrates the fundamental aspects of the fingerprinting attack.</p>
+            </section>
+    
+            <section class="section">
+                <h2>Script flow</h2>
+                <ol class="ordered-list">
+                    <li>Initiates connection to a victim node running on localhost</li>
+                    <li>Establishes a  handshake connection</li>
+                    <li>Collects peer information by sending GetAddr requests</li>
+                    <li>Scrapes and analyzes data including:
+                        <ul class="sub-list">
+                            <li>IP addresses</li>
+                            <li>Timestamps</li>
+                            <li>Service flags</li>
+                        </ul>
+                    </li>
+                </ol>
+            </section>
+    
+            <section class="section">
+                <h2>Current Observations</h2>
+                <p>The script successfully fetches peer data from the victim node. However, the retrieved IP addresses tend to remain relatively constant between requests, as nodes typically maintain a stable set of peer connections.</p>
+            </section>
+    
+            <section class="section">
+                <h2>Limitations</h2>
+                <ul>
+                    <li>Currently only works with clearnet connections</li>
+                    <li>Connects to localhost for testing</li>
+                    <li>Retrieved peer list shows limited variance between requests</li>
+                </ul>
+            </section>
+    
+            <section class="section">
+                <h2>Next Steps</h2>
+                <ul>
+                    <li>Implement Tor connection capabilities</li>
+                    <li>Extend data collection over longer time periods</li>
+                    <li>Add correlation analysis between clearnet and Tor identities</li>
+                </ul>
+            </section>
+        </div>
+       </div>
 
         <img src="adr.png" alt="First image">
         <pre>
         <code>
-#!/usr/bin/env python3
-
-from time import sleep
-from commander import Commander
-from test_framework import messages
-from test_framework.p2p import P2PInterface
-from test_framework.messages import msg_getaddr
-
-
-class SpyNode(P2PInterface):
-    def __init__(self):
-        super().__init__()
-        self.addr_received = []
-        self.connection_count = 0
-
-    def on_addr(self, message):
-        """Store received addresses"""
-        for addr in message.addrs:
-            self.addr_received.append({
-                'ip': addr.ip,
-                'port': addr.port,
-                'time': addr.time,
-                'services': addr.nServices,
-                'connection': self.connection_count
-            })
-        
-    def on_version(self, message):
-        """Handle version and immediately request addresses"""
-        super().on_version(message)
-        self.send_message(msg_getaddr())
-
-
-class AddrSpyScenario(Commander):
-    def set_test_params(self):
-        self.num_nodes = 1
-        
-    def add_options(self, parser):
-        parser.add_argument(
-            "--target",
-            dest="target",
-            default="tank-0000",
-            help="Target node to spy on",
-        )
-        parser.add_argument(
-            "--attempts",
-            dest="attempts",
-            type=int,
-            default=10,
-            help="Number of connection attempts",
-        )
-        parser.add_argument(
-            "--delay",
-            dest="delay",
-            type=int,
-            default=2,
-            help="Delay between connections",
-        )
-
-    def run_test(self):
-        # Get target node info
-        target_node = None
-        target_name = getattr(self.options, 'target', 'tank-0000')
-        
-        # Find target node
-        for node in self.nodes:
-            if node.tank == target_name:
-                target_node = node
-                break
-                
-        if not target_node:
-            self.log.error(f"Target node {target_name} not found")
-            return
+            import socket
+            import struct
+            import time
+            import random
+            from hashlib import sha256
+            import ipaddress
+            from datetime import datetime
             
-        host = target_node.rpchost
-        port = 18444
-        
-        self.log.info(f"Starting address spy attack on {target_name} ({host}:{port})")
-        self.log.info("This demonstrates how a spy node can harvest network information")
-        
-        collected_addresses = {}
-        total_connections = 0
-        
-        for i in range(getattr(self.options, 'attempts', 10)):
-            self.log.info(f"\nConnection attempt {i+1}")
             
-            try:
-                spy = SpyNode()
-                spy.connection_count = i + 1
+            def decode_netaddr(data, with_time=True):
+                pos = 0
+                if with_time:
+                    timestamp = struct.unpack('<I', data[pos:pos+4])[0]
+                    pos += 4
+                else:
+                    timestamp = int(time.time())
                 
-                # Connect to target
-                spy.peer_connect(
-                    dstaddr=host,
-                    dstport=port,
-                    net="regtest",
-                    timeout_factor=self.options.timeout_factor
-                )()
+                services = struct.unpack('<Q', data[pos:pos+8])[0]
+                pos += 8
+            
+                # IPV6
+                ipbytes = data[pos:pos+16]
+                pos += 16
+            
+                # Convert IPv4-mapped IPv6 address
+                if ipbytes.startswith(b'\x00' * 10 + b'\xff\xff'):
+                    ip = str(ipaddress.IPv4Address(ipbytes[-4:]))
+                else:
+                    ip = str(ipaddress.IPv6Address(ipbytes))
                 
-                # Wait for connection
-                spy.wait_for_connect()
-                self.log.info(f"Connected to target")
+                port = struct.unpack('>H', data[pos:pos+2])[0]
+            
+                return {
+                    'timestamp': datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'),
+                    'services': f"0x{services:x}",
+                    'ip': ip,
+                    'port': port
+                }
+            
+            
+            def decode_addr_message(payload):
+            
+                addresses = []
+                pos = 0
+            
+                # count of address 
+                count = int(payload[pos])
+                pos += 1
+            
+                for _ in range(count):
+                    if pos + 30 > len(payload):
+                        break
+                    
+                    addr = decode_netaddr(payload[pos:pos+30])
+                    addresses.append(addr)
+                    pos += 30
+            
+                return addresses
+            
+            
+            def create_message(command, payload=b''):
+                # Magic value for mainnet
+                magic = 0xD9B4BEF9
                 
-                # Wait for verack and addr responses
-                spy.wait_for_verack()
-                sleep(getattr(self.options, 'delay', 2))
+                # Command padding (12 bytes)
+                command_bytes = command.encode('ascii') + b'\0' * (12 - len(command))
                 
-                # Process received addresses
-                new_addrs = 0
-                for addr in spy.addr_received:
-                    addr_key = f"{addr['ip']}:{addr['port']}"
-                    if addr_key not in collected_addresses:
-                        collected_addresses[addr_key] = addr
-                        new_addrs += 1
+                # Length of payload
+                length = len(payload)
                 
-                self.log.info(f"Connection {i+1} found {len(spy.addr_received)} addresses ({new_addrs} new)")
-                total_connections += 1
+                # Checksum is first 4 bytes of double SHA256 of payload
+                if length > 0:
+                    checksum = sha256(sha256(payload).digest()).digest()[:4]
+                else:
+                    checksum = b'\x5D\xF6\xE0\xE2'  # Checksum for empty payload
                 
-                # Clean disconnect
-                spy.peer_disconnect()
-                sleep(1)
+                # Construct message
+                message = struct.pack('<L12sL4s', magic, command_bytes, length, checksum)
+                if payload:
+                    message += payload
                 
-            except Exception as e:
-                self.log.error(f"Error in connection attempt {i+1}: {str(e)}")
-                self.log.error("Exception details:", exc_info=True)
-
-        # Print summary
-        self.log.info("\nAddress Spy Attack Summary")
-        self.log.info("=" * 50)
-        self.log.info(f"Target Node: {target_name}")
-        self.log.info(f"Total Connections Made: {total_connections}")
-        self.log.info(f"Unique Addresses Discovered: {len(collected_addresses)}")
-        self.log.info("\nDiscovered Network Information:")
-        
-        for addr_key, addr in collected_addresses.items():
-            self.log.info(f"Node: {addr_key}")
-            self.log.info(f"  First seen in connection: {addr['connection']}")
-            self.log.info(f"  Services: {addr['services']}")
-            self.log.info(f"  Timestamp: {addr['time']}")
-            self.log.info("")
-
-
-def main():
-    AddrSpyScenario().main()
-
-
-if __name__ == "__main__":
-    main()
-
+                return message
+            
+            
+            def parse_message_header(data):
+                if len(data) < 24:  # Header is 24 bytes
+                    return None, None, None, None
+                
+                magic, command, length, checksum = struct.unpack('<L12sL4s', data[:24])
+                command = command.strip(b'\0').decode('ascii')
+                return magic, command, length, checksum
+            
+            
+            def send_getaddr():
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(30)
+                    print("Connecting to node...")
+                    sock.connect(('127.0.0.1', 8333))
+                    
+                    # Send version message
+                    version = 70015
+                    services = 0
+                    timestamp = int(time.time())
+                    addr_recv_services = struct.pack('<Q', services)
+                    addr_trans_services = struct.pack('<Q', services)
+                    addr_recv_ip = b'\x00' * 10 + b'\xff\xff' + socket.inet_aton('127.0.0.1')
+                    addr_recv_port = struct.pack('>H', 8333)
+                    addr_trans_ip = b'\x00' * 10 + b'\xff\xff' + socket.inet_aton('127.0.0.1')
+                    addr_trans_port = struct.pack('>H', 8333)
+                    
+                    nonce = random.getrandbits(64)
+                    user_agent = b"/TestNode:0.0.1/"
+                    start_height = 0
+                    relay = True
+            
+                    version_payload = struct.pack('<IQQ', version, services, timestamp)
+                    version_payload += addr_recv_services + addr_recv_ip + addr_recv_port
+                    version_payload += addr_trans_services + addr_trans_ip + addr_trans_port
+                    version_payload += struct.pack('<Q', nonce)
+                    version_payload += bytes([len(user_agent)]) + user_agent
+                    version_payload += struct.pack('<I?', start_height, relay)
+            
+                    print("Sending version message...")
+                    sock.send(create_message('version', version_payload))
+                    
+                    # Process responses
+                    buffer = b''
+                    handshake_complete = False
+                    addresses = []
+                    
+                    while True:
+                        data = sock.recv(1024)
+                        if not data:
+                            break
+                            
+                        buffer += data
+                        while len(buffer) >= 24:  # Header size
+                            magic, command, length = struct.unpack('<L12sL', buffer[:20])
+                            command = command.strip(b'\0').decode('ascii')
+                            
+                            if len(buffer) < 24 + length:
+                                break
+                                
+                            message = buffer[24:24+length]
+                            buffer = buffer[24+length:]
+                            
+                            print(f"Received command: {command}")
+                            
+                            if command == 'version':
+                                print("Sending verack...")
+                                sock.send(create_message('verack'))
+                            elif command == 'verack':
+                                if not handshake_complete:
+                                    print("Sending getaddr...")
+                                    sock.send(create_message('getaddr'))
+                                    handshake_complete = True
+                            elif command == 'addr':
+                                new_addresses = decode_addr_message(message)
+                                addresses.extend(new_addresses)
+                                print(f"Decoded {len(new_addresses)} addresses")
+                                for addr in new_addresses:
+                                    print(f"\nIP: {addr['ip']}:{addr['port']}")
+                                    print(f"Time: {addr['timestamp']}")
+                                    print(f"Services: {addr['services']}")
+                                
+                except Exception as e:
+                    print(f"Error: {str(e)}")
+                finally:
+                    sock.close()
+                    print("Connection closed")
+                    return addresses
+            
+            
+            if __name__ == "__main__":
+                addresses = send_getaddr()
+                print("\nTotal addresses received:", len(addresses))
         </code>
         </pre>
 
