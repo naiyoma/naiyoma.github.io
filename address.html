@@ -89,7 +89,7 @@
         <img src="adr.png" alt="First image">
         <pre>
         <code>
-            #!/usr/bin/env python3
+#!/usr/bin/env python3
 
 from time import sleep
 from commander import Commander
@@ -239,6 +239,168 @@ if __name__ == "__main__":
         </code>
         </pre>
 
+    </div>
+    <div>
+        <h3>
+            Analyze timestamp
+        </h3>
+        <pre>
+            <code>
+from datetime import datetime
+import numpy as np
+from collections import defaultdict
+from getaddr_test import send_getaddr    
+
+
+def analyze_timestamps(addresses, time_threshold=300):
+    timestamp_groups = defaultdict(list)
+    
+    for addr in addresses:
+        try:
+            # Parse the timestamp string into a datetime object
+            dt = datetime.strptime(addr['timestamp'], '%Y-%m-%d %H:%M:%S')
+            unix_ts = int(dt.timestamp())
+            
+            timestamp_groups[unix_ts].append({
+                'ip': addr['ip'],
+                'port': addr['port'],
+                'services': addr['services']
+            })
+        except (ValueError, TypeError) as e:
+            print(f"Error processing timestamp for address: {addr}")
+            continue
+    
+    print(f"\nAnalyzing {len(addresses)} addresses for timestamp correlations...")
+    print(f"Using time threshold of {time_threshold} seconds")
+    
+    # Find related timestamps
+    correlated_nodes = []
+    timestamps = sorted(timestamp_groups.keys())
+    
+    for i in range(len(timestamps)):
+        current_group = []
+        base_ts = timestamps[i]
+        
+        for j in range(i + 1, len(timestamps)):
+            if timestamps[j] - base_ts <= time_threshold:
+                if not current_group:
+                    current_group.extend(timestamp_groups[base_ts])
+                current_group.extend(timestamp_groups[timestamps[j]])
+            else:
+                break
+        
+        if current_group:
+            correlated_nodes.append({
+                'timestamp': datetime.fromtimestamp(base_ts).strftime('%Y-%m-%d %H:%M:%S'),
+                'nodes': current_group,
+                'count': len(current_group)
+            })
+    
+    # Print findings
+    if correlated_nodes:
+        print("\nFound potentially correlated nodes:")
+        for group in correlated_nodes:
+            print(f"\nTimestamp cluster at {group['timestamp']} with {group['count']} nodes:")
+            for node in group['nodes'][:5]:  # Show first 5 nodes in each group
+                print(f"  IP: {node['ip']}:{node['port']} Services: {node['services']}")
+            if len(group['nodes']) > 5:
+                print(f"  ... and {len(group['nodes']) - 5} more nodes")
+    else:
+        print("\nNo suspicious timestamp correlations found")
+    
+    return correlated_nodes
+
+
+def detect_fingerprinting(addresses):
+    print("\nAnalyzing for potential fingerprinting patterns...")
+    
+    # Group by /16 subnets
+    subnet_groups = defaultdict(list)
+    for addr in addresses:
+        try:
+            if '::ffff:' in addr['ip']:  # Handle IPv4-mapped-IPv6 addresses
+                ip_parts = addr['ip'].split(':')[-1].split('.')
+                subnet = '.'.join(ip_parts[:2])
+                subnet_groups[subnet].append(addr)
+        except Exception as e:
+            print(f"Error processing IP address: {addr}")
+            continue
+    
+    suspicious_patterns = []
+    
+    for subnet, nodes in subnet_groups.items():
+        if len(nodes) < 3:  # Need at least 3 nodes for meaningful analysis
+            continue
+        
+        # Analyze timestamp patterns
+        timestamps = []
+        for node in nodes:
+            try:
+                dt = datetime.strptime(node['timestamp'], '%Y-%m-%d %H:%M:%S')
+                timestamps.append(int(dt.timestamp()))
+            except (ValueError, TypeError) as e:
+                print(f"Error processing timestamp in subnet analysis: {node}")
+                continue
+        
+        if len(timestamps) < 3:  # Skip if we don't have enough valid timestamps
+            continue
+            
+        timestamps.sort()
+        time_diffs = np.diff(timestamps)
+        
+        if len(time_diffs) > 0:
+            mean_diff = np.mean(time_diffs)
+            std_diff = np.std(time_diffs)
+            
+            # Check for suspiciously regular patterns
+            if std_diff < mean_diff * 0.1:
+                suspicious_patterns.append({
+                    'subnet': subnet,
+                    'node_count': len(nodes),
+                    'mean_time_diff': mean_diff,
+                    'std_diff': std_diff,
+                    'nodes': nodes
+                })
+    
+    # Print findings
+    if suspicious_patterns:
+        print("\nFound suspicious patterns that might indicate fingerprinting:")
+        for pattern in suspicious_patterns:
+            print(f"\nSubnet: {pattern['subnet']}")
+            print(f"Node count: {pattern['node_count']}")
+            print(f"Mean time difference: {pattern['mean_time_diff']:.2f} seconds")
+            print(f"Time difference standard deviation: {pattern['std_diff']:.2f}")
+            print("Sample nodes:")
+            for node in pattern['nodes'][:3]:  # Show first 3 nodes
+                print(f"  IP: {node['ip']}:{node['port']} Time: {node['timestamp']}")
+    else:
+        print("\nNo suspicious fingerprinting patterns detected")
+    
+    return suspicious_patterns
+
+
+if __name__ == "__main__":
+    print("Fetching addresses from Bitcoin network...")
+    addresses = send_getaddr()
+    
+    if addresses:
+        print(f"\nReceived {len(addresses)} addresses")
+        
+        # Analyze timestamp correlations
+        correlated = analyze_timestamps(addresses)
+        
+        # Look for fingerprinting patterns
+        suspicious = detect_fingerprinting(addresses)
+        
+        # Print summary
+        print("\nAnalysis Summary:")
+        print(f"Total addresses analyzed: {len(addresses)}")
+        print(f"Correlated timestamp groups found: {len(correlated)}")
+        print(f"Suspicious fingerprinting patterns found: {len(suspicious)}")
+    else:
+        print("No addresses received to analyze")
+            </code>
+        </pre>
     </div>
 
         <div>
