@@ -350,8 +350,31 @@
     </div>
     <div>
         <h3>
-            Analyze timestamp
+            Analyze timestamp Script
         </h3>
+        <section class="section">
+            <h2>Script Flow</h2>
+            <ul>
+                <li>collect timestamps from peer addresses received from the victim node</li>
+                <li> groups addresses based on timestamp proximity</li>
+                <li> use a time threshold (300 seconds/5 minutes) to determine which timestamps are "close enough</li>
+            </ul>
+            <p>
+                <h4>
+                    When timestamps from different addresses are very close together, it might indicate:
+                </h4>
+                <li>
+                    The addresses belong to the same node
+                </li>
+                <li>
+                    The addresses were discovered at the same time
+                </li>
+                <li>
+                    The addresses are part of the same network or peer group
+                </li>
+            </p>
+        </section>
+
         <pre>
             <code>
 from datetime import datetime
