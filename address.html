@@ -1,159 +1,248 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Python Code Example</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin P2SH Transaction Creation Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        h3 {
+            color: #34495e;
+            margin-top: 25px;
+        }
+
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+            position: relative;
+        }
+
+        code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 14px;
+            color: #24292e;
+        }
+
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .important {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        ul, ol {
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Python Code Snippet</h1>
-    <pre>
-<code>
-    #!/usr/bin/env python3
+    <div class="container">
 
-    from time import sleep
-    from commander import Commander
-    from test_framework import messages
-    from test_framework.p2p import P2PInterface
-    from test_framework.messages import msg_getaddr
-    
-    
-    class SpyNode(P2PInterface):
-        def __init__(self):
-            super().__init__()
-            self.addr_received = []
-            self.connection_count = 0
-    
-        def on_addr(self, message):
-            """Store received addresses"""
-            for addr in message.addrs:
-                self.addr_received.append({
-                    'ip': addr.ip,
-                    'port': addr.port,
-                    'time': addr.time,
-                    'services': addr.nServices,
-                    'connection': self.connection_count
-                })
-            
-        def on_version(self, message):
-            """Handle version and immediately request addresses"""
-            super().on_version(message)
-            self.send_message(msg_getaddr())
-    
-    
-    class AddrSpyScenario(Commander):
-        def set_test_params(self):
-            self.num_nodes = 1
-            
-        def add_options(self, parser):
-            parser.add_argument(
-                "--target",
-                dest="target",
-                default="tank-0000",
-                help="Target node to spy on",
-            )
-            parser.add_argument(
-                "--attempts",
-                dest="attempts",
-                type=int,
-                default=10,
-                help="Number of connection attempts",
-            )
-            parser.add_argument(
-                "--delay",
-                dest="delay",
-                type=int,
-                default=2,
-                help="Delay between connections",
-            )
-    
-        def run_test(self):
-            # Get target node info
-            target_node = None
-            target_name = getattr(self.options, 'target', 'tank-0000')
-            
-            # Find target node
-            for node in self.nodes:
-                if node.tank == target_name:
-                    target_node = node
-                    break
-                    
-            if not target_node:
-                self.log.error(f"Target node {target_name} not found")
-                return
+        <h3>P2SH</h3>
+
+        
+        <pre>
+        <code>
+            #!/usr/bin/env python3
+
+from time import sleep
+from commander import Commander
+from test_framework import messages
+from test_framework.p2p import P2PInterface
+from test_framework.messages import msg_getaddr
+
+
+class SpyNode(P2PInterface):
+    def __init__(self):
+        super().__init__()
+        self.addr_received = []
+        self.connection_count = 0
+
+    def on_addr(self, message):
+        """Store received addresses"""
+        for addr in message.addrs:
+            self.addr_received.append({
+                'ip': addr.ip,
+                'port': addr.port,
+                'time': addr.time,
+                'services': addr.nServices,
+                'connection': self.connection_count
+            })
+        
+    def on_version(self, message):
+        """Handle version and immediately request addresses"""
+        super().on_version(message)
+        self.send_message(msg_getaddr())
+
+
+class AddrSpyScenario(Commander):
+    def set_test_params(self):
+        self.num_nodes = 1
+        
+    def add_options(self, parser):
+        parser.add_argument(
+            "--target",
+            dest="target",
+            default="tank-0000",
+            help="Target node to spy on",
+        )
+        parser.add_argument(
+            "--attempts",
+            dest="attempts",
+            type=int,
+            default=10,
+            help="Number of connection attempts",
+        )
+        parser.add_argument(
+            "--delay",
+            dest="delay",
+            type=int,
+            default=2,
+            help="Delay between connections",
+        )
+
+    def run_test(self):
+        # Get target node info
+        target_node = None
+        target_name = getattr(self.options, 'target', 'tank-0000')
+        
+        # Find target node
+        for node in self.nodes:
+            if node.tank == target_name:
+                target_node = node
+                break
                 
-            host = target_node.rpchost
-            port = 18444
+        if not target_node:
+            self.log.error(f"Target node {target_name} not found")
+            return
             
-            self.log.info(f"Starting address spy attack on {target_name} ({host}:{port})")
-            self.log.info("This demonstrates how a spy node can harvest network information")
+        host = target_node.rpchost
+        port = 18444
+        
+        self.log.info(f"Starting address spy attack on {target_name} ({host}:{port})")
+        self.log.info("This demonstrates how a spy node can harvest network information")
+        
+        collected_addresses = {}
+        total_connections = 0
+        
+        for i in range(getattr(self.options, 'attempts', 10)):
+            self.log.info(f"\nConnection attempt {i+1}")
             
-            collected_addresses = {}
-            total_connections = 0
-            
-            for i in range(getattr(self.options, 'attempts', 10)):
-                self.log.info(f"\nConnection attempt {i+1}")
+            try:
+                spy = SpyNode()
+                spy.connection_count = i + 1
                 
-                try:
-                    spy = SpyNode()
-                    spy.connection_count = i + 1
-                    
-                    # Connect to target
-                    spy.peer_connect(
-                        dstaddr=host,
-                        dstport=port,
-                        net="regtest",
-                        timeout_factor=self.options.timeout_factor
-                    )()
-                    
-                    # Wait for connection
-                    spy.wait_for_connect()
-                    self.log.info(f"Connected to target")
-                    
-                    # Wait for verack and addr responses
-                    spy.wait_for_verack()
-                    sleep(getattr(self.options, 'delay', 2))
-                    
-                    # Process received addresses
-                    new_addrs = 0
-                    for addr in spy.addr_received:
-                        addr_key = f"{addr['ip']}:{addr['port']}"
-                        if addr_key not in collected_addresses:
-                            collected_addresses[addr_key] = addr
-                            new_addrs += 1
-                    
-                    self.log.info(f"Connection {i+1} found {len(spy.addr_received)} addresses ({new_addrs} new)")
-                    total_connections += 1
-                    
-                    # Clean disconnect
-                    spy.peer_disconnect()
-                    sleep(1)
-                    
-                except Exception as e:
-                    self.log.error(f"Error in connection attempt {i+1}: {str(e)}")
-                    self.log.error("Exception details:", exc_info=True)
-    
-            # Print summary
-            self.log.info("\nAddress Spy Attack Summary")
-            self.log.info("=" * 50)
-            self.log.info(f"Target Node: {target_name}")
-            self.log.info(f"Total Connections Made: {total_connections}")
-            self.log.info(f"Unique Addresses Discovered: {len(collected_addresses)}")
-            self.log.info("\nDiscovered Network Information:")
-            
-            for addr_key, addr in collected_addresses.items():
-                self.log.info(f"Node: {addr_key}")
-                self.log.info(f"  First seen in connection: {addr['connection']}")
-                self.log.info(f"  Services: {addr['services']}")
-                self.log.info(f"  Timestamp: {addr['time']}")
-                self.log.info("")
-    
-    
-    def main():
-        AddrSpyScenario().main()
-    
-    
-    if __name__ == "__main__":
-        main()
-</code>
-    </pre>
+                # Connect to target
+                spy.peer_connect(
+                    dstaddr=host,
+                    dstport=port,
+                    net="regtest",
+                    timeout_factor=self.options.timeout_factor
+                )()
+                
+                # Wait for connection
+                spy.wait_for_connect()
+                self.log.info(f"Connected to target")
+                
+                # Wait for verack and addr responses
+                spy.wait_for_verack()
+                sleep(getattr(self.options, 'delay', 2))
+                
+                # Process received addresses
+                new_addrs = 0
+                for addr in spy.addr_received:
+                    addr_key = f"{addr['ip']}:{addr['port']}"
+                    if addr_key not in collected_addresses:
+                        collected_addresses[addr_key] = addr
+                        new_addrs += 1
+                
+                self.log.info(f"Connection {i+1} found {len(spy.addr_received)} addresses ({new_addrs} new)")
+                total_connections += 1
+                
+                # Clean disconnect
+                spy.peer_disconnect()
+                sleep(1)
+                
+            except Exception as e:
+                self.log.error(f"Error in connection attempt {i+1}: {str(e)}")
+                self.log.error("Exception details:", exc_info=True)
+
+        # Print summary
+        self.log.info("\nAddress Spy Attack Summary")
+        self.log.info("=" * 50)
+        self.log.info(f"Target Node: {target_name}")
+        self.log.info(f"Total Connections Made: {total_connections}")
+        self.log.info(f"Unique Addresses Discovered: {len(collected_addresses)}")
+        self.log.info("\nDiscovered Network Information:")
+        
+        for addr_key, addr in collected_addresses.items():
+            self.log.info(f"Node: {addr_key}")
+            self.log.info(f"  First seen in connection: {addr['connection']}")
+            self.log.info(f"  Services: {addr['services']}")
+            self.log.info(f"  Timestamp: {addr['time']}")
+            self.log.info("")
+
+
+def main():
+    AddrSpyScenario().main()
+
+
+if __name__ == "__main__":
+    main()
+
+        </code>
+        </pre>
+
+    </div>
+
+        <div>
+            <a href="address.html">Contact</a>
+        </div>
 </body>
 </html>
