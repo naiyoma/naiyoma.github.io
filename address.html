@@ -125,8 +125,8 @@
        <div>
         <div class="container">
             <section class="section">
-                <h4>Current Implementation</h4>
-                <p>This is a first iteration of this script focuses on the basic mechanism of data collection, without yet implementing Tor connectivity. The script demonstrates the fundamental aspects of the fingerprinting attack.</p>
+                <h4>Draft Implementation</h4>
+                <p>The aim of the scripts below is to scrape data from my local node and try to find a correlation between Tor and clearnet connections.</p>
             </section>
     
             <section class="section">
@@ -135,7 +135,7 @@
                     <li>Initiates connection to a victim node running on localhost</li>
                     <li>Establishes a  handshake connection</li>
                     <li>Collects peer information by sending GetAddr requests</li>
-                    <li>Scrapes and analyzes data including:
+                    <li>Scrapes and analyze:
                         <ul class="sub-list">
                             <li>IP addresses</li>
                             <li>Timestamps</li>
@@ -147,24 +147,24 @@
     
             <section class="section">
                 <h4>Current Observations</h4>
-                <p>The script successfully fetches peer data from the victim node. However, the retrieved IP addresses tend to remain relatively constant between requests, as nodes typically maintain a stable set of peer connections.</p>
+                <p>The script successfully fetches peer data from the victim node. However, the retrieved IP addresses tend to remain relatively constant between requests</p>
             </section>
     
             <section class="section">
-                <h4>Limitations</h4>
-                <ul>
-                    <li>Currently only works with clearnet connections</li>
-                    <li>Connects to localhost for testing</li>
-                    <li>Retrieved peer list shows limited variance between requests</li>
-                </ul>
             </section>
     
             <section class="section">
-                <h4>Next Steps</h4>
+                <h4></h4>
                 <ul>
-                    <li>Implement Tor connection capabilities</li>
-                    <li>Extend data collection over longer time periods</li>
-                    <li>Add correlation analysis between clearnet and Tor identities</li>
+                    <code><li>create_connection (creates a socket connection to my local node)</li></code>
+                    <li><code>create_message</code> (Defines Version Message details and then create version message using the payload) and send the message via our socket</li>
+                    <li>wait a few seconds for a response from local connection</li>
+                    <li>Decode the data thats being returned, we want ti=o check the command thats being sent as part of the response(since we had sent a version message we should get a verack message )</li>
+                    <li>After getting a verack message we send a getaddr request and wait for the response and this completes the handshake process</li>
+                    <li>Finally we get addr message and decode the response to get, addresses, timestamp and services </li>
+                    <p>This goes on until we have no new new_addresses </p>
+                    <p> I wanted to collect as much data from both connections (tor and clearnet) as possible </p>
+                    <p>My observation is that both clearnet and tor return the same addresses over and over, the range from the count is constantly between 253 and 260 even after running the script multiple times</p>
                 </ul>
             </section>
         </div>
@@ -173,260 +173,281 @@
         <img src="adr.png" alt="First image">
         <pre>
         <code>
-            import socket
-            import struct
-            import time
-            import socket
-            import struct
-            import time
-            import random
-            from hashlib import sha256
-            import ipaddress
-            from datetime import datetime
-            import socks
-            
-            
-            
-            def decode_netaddr(data, with_time=True):
-                pos = 0
-                if with_time:
-                    timestamp = struct.unpack('<I', data[pos:pos+4])[0]
-                    pos += 4
-                else:
-                    timestamp = int(time.time())
+            <py-script>
+                import socket
+                import struct
+                import time
+                import random
+                from hashlib import sha256
+                import ipaddress
+                from datetime import datetime
+                import socks
                 
-                services = struct.unpack('<Q', data[pos:pos+8])[0]
-                pos += 8
-            
-                # IPV6
-                ipbytes = data[pos:pos+16]
-                pos += 16
-            
-                # Convert IPv4-mapped IPv6 address
-                if ipbytes.startswith(b'\x00' * 10 + b'\xff\xff'):
-                    ip = str(ipaddress.IPv4Address(ipbytes[-4:]))
-                else:
-                    ip = str(ipaddress.IPv6Address(ipbytes))
-                
-                port = struct.unpack('>H', data[pos:pos+2])[0]
-            
-                return {
-                    'timestamp': datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'),
-                    'services': f"0x{services:x}",
-                    'ip': ip,
-                    'port': port
-                }
-            
-            
-            def decode_addr_message(payload):
-            
-                addresses = []
-                pos = 0
-            
-                # count of address 
-                count = int(payload[pos])
-                pos += 1
-            
-                for _ in range(count):
-                    if pos + 30 > len(payload):
-                        break
+                def decode_netaddr(data, with_time=True):
+                    pos = 0
+                    if with_time:
+                        timestamp = struct.unpack('&lt;I', data[pos:pos+4])[0]
+                        pos += 4
+                    else:
+                        timestamp = int(time.time())
                     
-                    addr = decode_netaddr(payload[pos:pos+30])
-                    addresses.append(addr)
-                    pos += 30
-            
-                return addresses
-            
-            
-            def create_message(command, payload=b''):
-                # Magic value for mainnet
-                magic = 0xD9B4BEF9
+                    services = struct.unpack('&lt;Q', data[pos:pos+8])[0]
+                    pos += 8
+
+                    ipbytes = data[pos:pos+16]
+                    pos += 16
                 
-                # Command padding (12 bytes)
-                command_bytes = command.encode('ascii') + b'\0' * (12 - len(command))
-                
-                # Length of payload
-                length = len(payload)
-                
-                # Checksum is first 4 bytes of double SHA256 of payload
-                if length > 0:
-                    checksum = sha256(sha256(payload).digest()).digest()[:4]
-                else:
-                    checksum = b'\x5D\xF6\xE0\xE2'  # Checksum for empty payload
-                
-                # Construct message
-                message = struct.pack('<L12sL4s', magic, command_bytes, length, checksum)
-                if payload:
-                    message += payload
-                
-                return message
-            
-            
-            def parse_message_header(data):
-                if len(data) < 24:  # Header is 24 bytes
-                    return None, None, None, None
-                
-                magic, command, length, checksum = struct.unpack('<L12sL4s', data[:24])
-                command = command.strip(b'\0').decode('ascii')
-                return magic, command, length, checksum
-            
-            
-            def create_connection(use_tor=False, target_host='127.0.0.1', port=8333):
-                """Create either a regular socket or Tor socket connection"""
-                if use_tor:
-                    sock = socks.socksocket()
-                    sock.set_proxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
-                else:
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(30)
-                return sock
-            
-            
-            def send_getaddr(use_tor=False, target_host='127.0.0.1', port=8333):
-                addresses = []
-                try:
-                    sock = create_connection(use_tor)
-                    print(f"Connecting to {target_host}:{port} via {'Tor' if use_tor else 'Clearnet'}...")
-                    sock.connect((target_host, port))
-            
-                    # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    # sock.settimeout(30)
-                    # print("Connecting to node...")
-                    # sock.connect(('127.0.0.1', 8333))
+                    if ipbytes.startswith(b'\x00' * 10 + b'\xff\xff'):
+                        ip = str(ipaddress.IPv4Address(ipbytes[-4:]))
+                    else:
+                        ip = str(ipaddress.IPv6Address(ipbytes))
                     
-                    # Send version message
-                    version = 70015
-                    services = 0
-                    timestamp = int(time.time())
-                    addr_recv_services = struct.pack('<Q', services)
-                    addr_trans_services = struct.pack('<Q', services)
-                    addr_recv_ip = b'\x00' * 10 + b'\xff\xff' + socket.inet_aton('127.0.0.1')
-                    addr_recv_port = struct.pack('>H', 8333)
-                    addr_trans_ip = b'\x00' * 10 + b'\xff\xff' + socket.inet_aton('127.0.0.1')
-                    addr_trans_port = struct.pack('>H', 8333)
-                    
-                    nonce = random.getrandbits(64)
-                    user_agent = b"/TestNode:0.0.1/"
-                    start_height = 0
-                    relay = True
-            
-                    version_payload = struct.pack('<IQQ', version, services, timestamp)
-                    version_payload += addr_recv_services + addr_recv_ip + addr_recv_port
-                    version_payload += addr_trans_services + addr_trans_ip + addr_trans_port
-                    version_payload += struct.pack('<Q', nonce)
-                    version_payload += bytes([len(user_agent)]) + user_agent
-                    version_payload += struct.pack('<I?', start_height, relay)
-            
-                    print("Sending version message...")
-                    sock.send(create_message('version', version_payload))
-                    
-                    # Process responses
-                    buffer = b''
-                    handshake_complete = False
+                    port = struct.unpack('&gt;H', data[pos:pos+2])[0]
+                
+                    return {
+                        'timestamp': datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'),
+                        'services': f"0x{services:x}",
+                        'ip': ip,
+                        'port': port
+                    }
+                
+                def decode_addr_message(payload):
                     addresses = []
-                    
-                    while True:
-                        data = sock.recv(1024)
-                        if not data:
+                    pos = 0
+                    # count of address 
+                    count = int(payload[pos])
+                    pos += 1
+                    for _ in range(count):
+                        if pos + 30 &gt; len(payload):
                             break
-                            
-                        buffer += data
-                        while len(buffer) >= 24:  # Header size
-                            magic, command, length = struct.unpack('<L12sL', buffer[:20])
-                            command = command.strip(b'\0').decode('ascii')
-                            
-                            if len(buffer) < 24 + length:
+                        
+                        addr = decode_netaddr(payload[pos:pos+30])
+                        addresses.append(addr)
+                        pos += 30
+                    return addresses
+                
+                
+                def create_message(command, payload=b''):
+                    magic = 0xD9B4BEF9
+                    command_bytes = command.encode('ascii') + b'\0' * (12 - len(command))
+                    length = len(payload)
+                    
+                    # Checksum is first 4 bytes of double SHA256 of payload
+                    if length &gt; 0:
+                        checksum = sha256(sha256(payload).digest()).digest()[:4]
+                    else:
+                        checksum = b'\x5D\xF6\xE0\xE2'  # Checksum for empty payload
+                    # Construct message
+                    message = struct.pack('&lt;L12sL4s', magic, command_bytes, length, checksum)
+                    if payload:
+                        message += payload
+                    return message
+                
+                
+                def parse_message_header(data):
+                    if len(data) &lt; 24:  # Header is 24 bytes
+                        return None, None, None, None
+                    magic, command, length, checksum = struct.unpack('&lt;L12sL4s', data[:24])
+                    command = command.strip(b'\0').decode('ascii')
+                    return magic, command, length, checksum
+                
+                
+                def create_connection(use_tor=False, target_host='127.0.0.1', port=8333):
+                    """Create either a regular socket or Tor socket connection"""
+                    if use_tor:
+                        sock = socks.socksocket()
+                        sock.set_proxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
+                    else:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(30)
+                    return sock
+                
+                
+                def send_getaddr(use_tor=False, target_host='127.0.0.1', port=8333):
+                    addresses = []
+                    try:
+                        sock = create_connection(use_tor)
+                        print(f"Connecting to {target_host}:{port} via {'Tor' if use_tor else 'Clearnet'}...")
+                        sock.connect((target_host, port))
+                
+                        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        # sock.settimeout(30)
+                        # print("Connecting to node...")
+                        # sock.connect(('127.0.0.1', 8333))
+                        
+                        # Send version message
+                        version = 70015
+                        services = 0
+                        timestamp = int(time.time())
+                        addr_recv_services = struct.pack('&lt;Q', services)
+                        addr_trans_services = struct.pack('&lt;Q', services)
+                        addr_recv_ip = b'\x00' * 10 + b'\xff\xff' + socket.inet_aton('127.0.0.1')
+                        addr_recv_port = struct.pack('>H', 8333)
+                        addr_trans_ip = b'\x00' * 10 + b'\xff\xff' + socket.inet_aton('127.0.0.1')
+                        addr_trans_port = struct.pack('>H', 8333)
+                        
+                        nonce = random.getrandbits(64)
+                        user_agent = b"/TestNode:0.0.1/"
+                        start_height = 0
+                        relay = True
+                
+                        version_payload = struct.pack('&lt;IQQ', version, services, timestamp)
+                        version_payload += addr_recv_services + addr_recv_ip + addr_recv_port
+                        version_payload += addr_trans_services + addr_trans_ip + addr_trans_port
+                        version_payload += struct.pack('&lt;Q', nonce)
+                        version_payload += bytes([len(user_agent)]) + user_agent
+                        version_payload += struct.pack('&lt;I?', start_height, relay)
+                
+                        print("Sending version message...")
+                        sock.send(create_message('version', version_payload))
+                        
+                        # Process responses
+                        buffer = b''
+                        handshake_complete = False
+                        addresses = []
+                        
+                        while True:
+                            data = sock.recv(1024)
+                            if not data:
                                 break
                                 
-                            message = buffer[24:24+length]
-                            buffer = buffer[24+length:]
-                            
-                            print(f"Received command: {command}")
-                            
-                            if command == 'version':
-                                print("Sending verack...")
-                                sock.send(create_message('verack'))
-                            elif command == 'verack':
-                                if not handshake_complete:
-                                    print("Sending getaddr...")
-                                    sock.send(create_message('getaddr'))
-                                    handshake_complete = True
-                            elif command == 'addr':
-                                new_addresses = decode_addr_message(message)
-                                addresses.extend(new_addresses)
-                                print(f"Decoded {len(new_addresses)} addresses")
-                                for addr in new_addresses:
-                                    print(f"\nIP: {addr['ip']}:{addr['port']}")
-                                    print(f"Time: {addr['timestamp']}")
-                                    print(f"Services: {addr['services']}")
+                            buffer += data
+                            while len(buffer) >= 24:  # Header size
+                                magic, command, length = struct.unpack('&lt;L12sL', buffer[:20])
+                                command = command.strip(b'\0').decode('ascii')
                                 
-                except Exception as e:
-                    print(f"Error: {str(e)}")
-                finally:
-                    sock.close()
-                    print("Connection closed")
-                    return addresses
-            
-            if __name__ == "__main__":
-                # Test clearnet
-                print("Testing clearnet connection...")
-                clearnet_addresses = send_getaddr(use_tor=False)
-                print("\nTotal clearnet addresses received:", len(clearnet_addresses))
-            
-                # Test Tor (if you have an onion address to test)
-                print("\nTesting Tor connection...")
-                tor_addresses = send_getaddr(use_tor=True, target_host='hs26bmwa22yst7s7eyolyerj3ffiy6e26ayhw7g3qzlunndiwaty7ryd.onion')
-                print("\nTotal Tor addresses received:", len(tor_addresses))
+                                if len(buffer) &lt; 24 + length:
+                                    break
+                                    
+                                message = buffer[24:24+length]
+                                buffer = buffer[24+length:]
+                                
+                                print(f"Received command: {command}")
+                                
+                                if command == 'version':
+                                    print("Sending verack...")
+                                    sock.send(create_message('verack'))
+                                elif command == 'verack':
+                                    if not handshake_complete:
+                                        print("Sending getaddr...")
+                                        sock.send(create_message('getaddr'))
+                                        handshake_complete = True
+                                elif command == 'addr':
+                                    new_addresses = decode_addr_message(message)
+                                    addresses.extend(new_addresses)
+                                    print(f"Decoded {len(new_addresses)} addresses")
+                                    for addr in new_addresses:
+                                        print(f"\nIP: {addr['ip']}:{addr['port']}")
+                                        print(f"Time: {addr['timestamp']}")
+                                        print(f"Services: {addr['services']}")
+                                    
+                    except Exception as e:
+                        print(f"Error: {str(e)}")
+                    finally:
+                        sock.close()
+                        print("Connection closed")
+                        return addresses
+                
+                if __name__ == "__main__":
+                    # Test clearnet
+                    print("Testing clearnet connection...")
+                    clearnet_addresses = send_getaddr(use_tor=False)
+                    print("\nTotal clearnet addresses received:", len(clearnet_addresses))
+                
+                    # Test Tor (if you have an onion address to test)
+                    print("\nTesting Tor connection...")
+                    tor_addresses = send_getaddr(use_tor=True, target_host='hs26bmwa22yst7s7eyolyerj3ffiy6e26ayhw7g3qzlunndiwaty7ryd.onion')
+                    print("\nTotal Tor addresses received:", len(tor_addresses))
+
+            </py-script>               
         </code>
         </pre>
         <h4>Output from script above </h4>
         <section class="section">
             <pre>
                 <code>
-IP: ::ffff:2256:2036
-Time: 1984-08-08 16:29:04
-Services: 0x409674c
+                    IP: 0:2600:1700:22d9:981f:e8af:1273:3e5b:9555                                                                                                                                            
+                    Time: 2056-05-01 03:47:28                                                                                                                                                                
+                    Services: 0xc09673d                                                                                                                                                                      
+                                                                                                                                                                                                            
+                    IP: ::ffff:4d39:21072                                                                                                                                                                    
+                    Time: 2030-07-01 22:42:24                                                                                                                                                                
+                    Services: 0xc496732                                                                                                                                                                      
+                                                                                                                                                                                                            
+                    IP: 0:2409:8a55:213:1060:73ef:9f47:beff:65089                                                                                                                                            
+                    Time: 2091-02-22 04:53:36                                                                                                                                                                
+                    Services: 0xc086748                                                                                                                                                                      
+                                                                                                                                                                                                            
+                    IP: 0:2001:1c01:3016:f700:ecc4:dca6:bcdb:58440                                                                                                                                           
+                    Time: 2022-05-29 18:11:28                                                                                                                                                                
+                    Services: 0x4086738                                                                                                                                                                      
+                                                                                                                                                                                                            
+                    IP: ::ffff:5004:6335                                                                                                                                                                     
+                    Time: 2001-07-14 03:06:56                                                                                                                                                                
+                    Services: 0xc08673e                                                                                                                                                                      
+                                                                                                                                                                                                            
+                    IP: ::ffff:179a:45340                                                                                                                                                                    
+                    Time: 2034-04-27 14:53:04                                                                                                                                                                
+                    Services: 0xc7d674d                                                                                                                                                                      
+                    Error: timed out                                                                                                                                                                         
+                    Connection closed                                                                                                                                                                        
+                                                                                                                                                                                                            
+                    Total clearnet addresses received: 253                                                                                                                                                   
+                                                                                                                                                                                                            
+                    Testing Tor connection...                                                                                                                                                                
+                    Connecting to hs26bmwa22yst7s7eyolyerj3ffiy6e26ayhw7g3qzlunndiwaty7ryd.onion:8333 via Tor...                                                                                             
+                    Sending version message...                                                                                                                                                               
+                    Received command: version                                                                                                                                                                
+                    Sending verack...                                                                                                                                                                        
+                    Received command: verack                                                                                                                                                                 
+                    Sending getaddr...                                                                                                                                                                       
+                    Received command: sendcmpct                                                                                                                                                              
+                    Received command: ping                                                                                                                                                                   
+                    Received command: feefilter                                                                                                                                                              
+                    Received command: addr                                                                                                                                                                   
+                    Decoded 253 addresses 
 
-IP: ::ffff:47a7:24194
-Time: 1981-06-02 21:04:16
-Services: 0x409674b
-
-IP: ::ffff:2242:14528
-Time: 2010-05-02 17:33:04
-Services: 0x44d674c
-
-IP: ::ffff:4784:60834
-Time: 2087-08-05 03:17:36
-Services: 0x40d673b
-
-IP: 0:2603:3007:2107:300:::1636
-Time: 1993-02-12 14:42:24
-Services: 0x4096748
-
-IP: ::ffff:6e35:26041
-Time: 1990-06-19 05:25:36
-Services: 0x40c674a
-
-IP: ffff:2a01:4f9:3a:3961:::2
-Time: 2042-11-08 08:56:48
-Services: 0xffffffffffff674c
-
-IP: ::ffff:68f3:12459
-Time: 2103-07-25 09:16:00
-Services: 0xc7d674b
-
-IP: ::ffff:1f2d:23038
-Time: 1979-09-15 08:12:00
-Services: 0xc496748
-
-IP: 0:2001:bc8:1201:71a:2e59:e5ff:fe42:21236
-Time: 2097-01-31 07:48:32
-Services: 0x24000c49673c
-
-Error: timed out
-Connection closed
-
-Total addresses received: 253
+                    IP: ::ffff:4832:1365
+                    Time: 2077-03-27 09:43:44
+                    Services: 0x4096740
+                    
+                    IP: 0:2600:1700:22d9:981f:e8af:1273:3e5b:9555
+                    Time: 2056-05-01 03:47:28
+                    Services: 0xc09673d
+                    
+                    IP: ::ffff:4d39:21072
+                    Time: 2030-07-01 22:42:24
+                    Services: 0xc496732
+                    
+                    IP: 0:2409:8a55:213:1060:73ef:9f47:beff:65089
+                    Time: 2091-02-22 04:53:36
+                    Services: 0xc086748
+                    
+                    IP: 0:2001:1c01:3016:f700:ecc4:dca6:bcdb:58440
+                    Time: 2022-05-29 18:11:28
+                    Services: 0x4086738
+                    
+                    IP: ::ffff:5004:6335
+                    Time: 2001-07-14 03:06:56
+                    Services: 0xc08673e
+                    
+                    IP: ::ffff:179a:45340
+                    Time: 2034-04-27 14:53:04
+                    Services: 0xc7d674d
+                    Received command: addr
+                    Decoded 2 addresses
+                    
+                    IP: 84.32.186.158:8333
+                    Time: 2024-12-03 23:00:57
+                    Services: 0x409
+                    
+                    IP: 209.204.29.11:8333
+                    Time: 2024-12-03 22:56:22
+                    Services: 0x409
+                    Error: timed out
+                    Connection closed
+                    
+                    Total Tor addresses received: 255
                 </code>
             </pre>
         </section>
@@ -767,7 +788,6 @@ No suspicious fingerprinting patterns detected
 Final Analysis Summary:
 Total samples analyzed: 3
 Total correlations found: 0
-
 
         </code>
     </pre>
