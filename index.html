@@ -215,7 +215,6 @@ bitcoin-cli -regtest generatetoaddress 1 \
     
     bitcoin-cli -rpcwallet=wallet3 generatetoaddress 1 $(bitcoin-cli -rpcwallet=wallet3 getnewaddress)
 
-
             <pre><code># Get full transaction details with witness data
     bitcoin-cli getrawtransaction $SPENT_TXID true
     

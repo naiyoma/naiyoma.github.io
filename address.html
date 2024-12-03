@@ -346,6 +346,57 @@
                 print("\nTotal addresses received:", len(addresses))
         </code>
         </pre>
+        <h4>Output from script above </h4>
+        <section class="section">
+            <pre>
+                <code>
+                    IP: ::ffff:2256:2036
+Time: 1984-08-08 16:29:04
+Services: 0x409674c
+
+IP: ::ffff:47a7:24194
+Time: 1981-06-02 21:04:16
+Services: 0x409674b
+
+IP: ::ffff:2242:14528
+Time: 2010-05-02 17:33:04
+Services: 0x44d674c
+
+IP: ::ffff:4784:60834
+Time: 2087-08-05 03:17:36
+Services: 0x40d673b
+
+IP: 0:2603:3007:2107:300:::1636
+Time: 1993-02-12 14:42:24
+Services: 0x4096748
+
+IP: ::ffff:6e35:26041
+Time: 1990-06-19 05:25:36
+Services: 0x40c674a
+
+IP: ffff:2a01:4f9:3a:3961:::2
+Time: 2042-11-08 08:56:48
+Services: 0xffffffffffff674c
+
+IP: ::ffff:68f3:12459
+Time: 2103-07-25 09:16:00
+Services: 0xc7d674b
+
+IP: ::ffff:1f2d:23038
+Time: 1979-09-15 08:12:00
+Services: 0xc496748
+
+IP: 0:2001:bc8:1201:71a:2e59:e5ff:fe42:21236
+Time: 2097-01-31 07:48:32
+Services: 0x24000c49673c
+
+Error: timed out
+Connection closed
+
+Total addresses received: 253
+                </code>
+            </pre>
+        </section>
 
     </div>
     <div>
@@ -533,9 +584,31 @@ if __name__ == "__main__":
             </code>
         </pre>
     </div>
+    <section class="section"></section>
+    <h4>Sample Output</h4>
+    <pre>
+        <code>
+            Received 253 addresses
+
+Analyzing 253 addresses for timestamp correlations...
+Using time threshold of 300 seconds
+
+No suspicious timestamp correlations found
+
+Analyzing for potential fingerprinting patterns...
+
+No suspicious fingerprinting patterns detected
+
+Analysis Summary:
+Total addresses analyzed: 253
+Correlated timestamp groups found: 0
+Suspicious fingerprinting patterns found: 0
+
+        </code>
+    </pre>
 
         <div>
-            <a href="address.html">Contact</a>
+            <a href="address.html"></a>
         </div>
 </body>
 </html>
