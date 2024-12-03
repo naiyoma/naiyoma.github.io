@@ -176,10 +176,15 @@
             import socket
             import struct
             import time
+            import socket
+            import struct
+            import time
             import random
             from hashlib import sha256
             import ipaddress
             from datetime import datetime
+            import socks
+            
             
             
             def decode_netaddr(data, with_time=True):
@@ -266,12 +271,28 @@
                 return magic, command, length, checksum
             
             
-            def send_getaddr():
-                try:
+            def create_connection(use_tor=False, target_host='127.0.0.1', port=8333):
+                """Create either a regular socket or Tor socket connection"""
+                if use_tor:
+                    sock = socks.socksocket()
+                    sock.set_proxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
+                else:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.settimeout(30)
-                    print("Connecting to node...")
-                    sock.connect(('127.0.0.1', 8333))
+                sock.settimeout(30)
+                return sock
+            
+            
+            def send_getaddr(use_tor=False, target_host='127.0.0.1', port=8333):
+                addresses = []
+                try:
+                    sock = create_connection(use_tor)
+                    print(f"Connecting to {target_host}:{port} via {'Tor' if use_tor else 'Clearnet'}...")
+                    sock.connect((target_host, port))
+            
+                    # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    # sock.settimeout(30)
+                    # print("Connecting to node...")
+                    # sock.connect(('127.0.0.1', 8333))
                     
                     # Send version message
                     version = 70015
@@ -346,10 +367,16 @@
                     print("Connection closed")
                     return addresses
             
-            
             if __name__ == "__main__":
-                addresses = send_getaddr()
-                print("\nTotal addresses received:", len(addresses))
+                # Test clearnet
+                print("Testing clearnet connection...")
+                clearnet_addresses = send_getaddr(use_tor=False)
+                print("\nTotal clearnet addresses received:", len(clearnet_addresses))
+            
+                # Test Tor (if you have an onion address to test)
+                print("\nTesting Tor connection...")
+                tor_addresses = send_getaddr(use_tor=True, target_host='hs26bmwa22yst7s7eyolyerj3ffiy6e26ayhw7g3qzlunndiwaty7ryd.onion')
+                print("\nTotal Tor addresses received:", len(tor_addresses))
         </code>
         </pre>
         <h4>Output from script above </h4>
@@ -434,159 +461,254 @@ Total addresses received: 253
 
         <pre>
             <code>
-from datetime import datetime
-import numpy as np
-from collections import defaultdict
-from getaddr_test import send_getaddr    
-
-
-def analyze_timestamps(addresses, time_threshold=300):
-    timestamp_groups = defaultdict(list)
-    
-    for addr in addresses:
-        try:
-            # Parse the timestamp string into a datetime object
-            dt = datetime.strptime(addr['timestamp'], '%Y-%m-%d %H:%M:%S')
-            unix_ts = int(dt.timestamp())
-            
-            timestamp_groups[unix_ts].append({
-                'ip': addr['ip'],
-                'port': addr['port'],
-                'services': addr['services']
-            })
-        except (ValueError, TypeError) as e:
-            print(f"Error processing timestamp for address: {addr}")
-            continue
-    
-    print(f"\nAnalyzing {len(addresses)} addresses for timestamp correlations...")
-    print(f"Using time threshold of {time_threshold} seconds")
-    
-    # Find related timestamps
-    correlated_nodes = []
-    timestamps = sorted(timestamp_groups.keys())
-    
-    for i in range(len(timestamps)):
-        current_group = []
-        base_ts = timestamps[i]
-        
-        for j in range(i + 1, len(timestamps)):
-            if timestamps[j] - base_ts <= time_threshold:
-                if not current_group:
-                    current_group.extend(timestamp_groups[base_ts])
-                current_group.extend(timestamp_groups[timestamps[j]])
-            else:
-                break
-        
-        if current_group:
-            correlated_nodes.append({
-                'timestamp': datetime.fromtimestamp(base_ts).strftime('%Y-%m-%d %H:%M:%S'),
-                'nodes': current_group,
-                'count': len(current_group)
-            })
-    
-    # Print findings
-    if correlated_nodes:
-        print("\nFound potentially correlated nodes:")
-        for group in correlated_nodes:
-            print(f"\nTimestamp cluster at {group['timestamp']} with {group['count']} nodes:")
-            for node in group['nodes'][:5]:  # Show first 5 nodes in each group
-                print(f"  IP: {node['ip']}:{node['port']} Services: {node['services']}")
-            if len(group['nodes']) > 5:
-                print(f"  ... and {len(group['nodes']) - 5} more nodes")
-    else:
-        print("\nNo suspicious timestamp correlations found")
-    
-    return correlated_nodes
-
-
-def detect_fingerprinting(addresses):
-    print("\nAnalyzing for potential fingerprinting patterns...")
-    
-    # Group by /16 subnets
-    subnet_groups = defaultdict(list)
-    for addr in addresses:
-        try:
-            if '::ffff:' in addr['ip']:  # Handle IPv4-mapped-IPv6 addresses
-                ip_parts = addr['ip'].split(':')[-1].split('.')
-                subnet = '.'.join(ip_parts[:2])
-                subnet_groups[subnet].append(addr)
-        except Exception as e:
-            print(f"Error processing IP address: {addr}")
-            continue
-    
-    suspicious_patterns = []
-    
-    for subnet, nodes in subnet_groups.items():
-        if len(nodes) < 3:  # Need at least 3 nodes for meaningful analysis
-            continue
-        
-        # Analyze timestamp patterns
-        timestamps = []
-        for node in nodes:
-            try:
-                dt = datetime.strptime(node['timestamp'], '%Y-%m-%d %H:%M:%S')
-                timestamps.append(int(dt.timestamp()))
-            except (ValueError, TypeError) as e:
-                print(f"Error processing timestamp in subnet analysis: {node}")
-                continue
-        
-        if len(timestamps) < 3:  # Skip if we don't have enough valid timestamps
-            continue
-            
-        timestamps.sort()
-        time_diffs = np.diff(timestamps)
-        
-        if len(time_diffs) > 0:
-            mean_diff = np.mean(time_diffs)
-            std_diff = np.std(time_diffs)
-            
-            # Check for suspiciously regular patterns
-            if std_diff < mean_diff * 0.1:
-                suspicious_patterns.append({
-                    'subnet': subnet,
-                    'node_count': len(nodes),
-                    'mean_time_diff': mean_diff,
-                    'std_diff': std_diff,
-                    'nodes': nodes
-                })
-    
-    # Print findings
-    if suspicious_patterns:
-        print("\nFound suspicious patterns that might indicate fingerprinting:")
-        for pattern in suspicious_patterns:
-            print(f"\nSubnet: {pattern['subnet']}")
-            print(f"Node count: {pattern['node_count']}")
-            print(f"Mean time difference: {pattern['mean_time_diff']:.2f} seconds")
-            print(f"Time difference standard deviation: {pattern['std_diff']:.2f}")
-            print("Sample nodes:")
-            for node in pattern['nodes'][:3]:  # Show first 3 nodes
-                print(f"  IP: {node['ip']}:{node['port']} Time: {node['timestamp']}")
-    else:
-        print("\nNo suspicious fingerprinting patterns detected")
-    
-    return suspicious_patterns
-
-
-if __name__ == "__main__":
-    print("Fetching addresses from Bitcoin network...")
-    addresses = send_getaddr()
-    
-    if addresses:
-        print(f"\nReceived {len(addresses)} addresses")
-        
-        # Analyze timestamp correlations
-        correlated = analyze_timestamps(addresses)
-        
-        # Look for fingerprinting patterns
-        suspicious = detect_fingerprinting(addresses)
-        
-        # Print summary
-        print("\nAnalysis Summary:")
-        print(f"Total addresses analyzed: {len(addresses)}")
-        print(f"Correlated timestamp groups found: {len(correlated)}")
-        print(f"Suspicious fingerprinting patterns found: {len(suspicious)}")
-    else:
-        print("No addresses received to analyze")
+                from datetime import datetime
+                import numpy as np
+                from collections import defaultdict
+                from getaddr_test import send_getaddr    
+                import time
+                
+                
+                def collect_samples(delay_between=60, num_samples=5):
+                    """Collect multiple samples from both clearnet and Tor"""
+                    all_samples = []
+                    
+                    for i in range(num_samples):
+                        print(f"\nCollecting sample {i+1}/{num_samples}")
+                        sample = {
+                            'timestamp': datetime.now(),
+                            'clearnet': send_getaddr(use_tor=False),
+                            'tor': send_getaddr(
+                                use_tor=True, 
+                                target_host='hs26bmwa22yst7s7eyolyerj3ffiy6e26ayhw7g3qzlunndiwaty7ryd.onion'
+                            )
+                        }
+                        all_samples.append(sample)
+                        
+                        if i < num_samples - 1:
+                            print(f"Waiting {delay_between} seconds...")
+                            time.sleep(delay_between)
+                    
+                    return all_samples
+                
+                def analyze_timestamps(addresses, time_threshold=300):
+                    timestamp_groups = defaultdict(list)
+                    
+                    for addr in addresses:
+                        try:
+                            # Parse the timestamp string into a datetime object
+                            dt = datetime.strptime(addr['timestamp'], '%Y-%m-%d %H:%M:%S')
+                            unix_ts = int(dt.timestamp())
+                            
+                            timestamp_groups[unix_ts].append({
+                                'ip': addr['ip'],
+                                'port': addr['port'],
+                                'services': addr['services']
+                            })
+                        except (ValueError, TypeError) as e:
+                            print(f"Error processing timestamp for address: {addr}")
+                            continue
+                    
+                    print(f"\nAnalyzing {len(addresses)} addresses for timestamp correlations...")
+                    print(f"Using time threshold of {time_threshold} seconds")
+                    
+                    # Find related timestamps
+                    correlated_nodes = []
+                    timestamps = sorted(timestamp_groups.keys())
+                    
+                    for i in range(len(timestamps)):
+                        current_group = []
+                        base_ts = timestamps[i]
+                        
+                        for j in range(i + 1, len(timestamps)):
+                            if timestamps[j] - base_ts <= time_threshold:
+                                if not current_group:
+                                    current_group.extend(timestamp_groups[base_ts])
+                                current_group.extend(timestamp_groups[timestamps[j]])
+                            else:
+                                break
+                        
+                        if current_group:
+                            correlated_nodes.append({
+                                'timestamp': datetime.fromtimestamp(base_ts).strftime('%Y-%m-%d %H:%M:%S'),
+                                'nodes': current_group,
+                                'count': len(current_group)
+                            })
+                    
+                    # Print findings
+                    if correlated_nodes:
+                        print("\nFound potentially correlated nodes:")
+                        for group in correlated_nodes:
+                            print(f"\nTimestamp cluster at {group['timestamp']} with {group['count']} nodes:")
+                            for node in group['nodes'][:5]:  # Show first 5 nodes in each group
+                                print(f"  IP: {node['ip']}:{node['port']} Services: {node['services']}")
+                            if len(group['nodes']) > 5:
+                                print(f"  ... and {len(group['nodes']) - 5} more nodes")
+                    else:
+                        print("\nNo suspicious timestamp correlations found")
+                    
+                    return correlated_nodes
+                
+                
+                def detect_fingerprinting(addresses):
+                    print("\nAnalyzing for potential fingerprinting patterns...")
+                    
+                    # Group by /16 subnets
+                    subnet_groups = defaultdict(list)
+                    for addr in addresses:
+                        try:
+                            if '::ffff:' in addr['ip']:  # Handle IPv4-mapped-IPv6 addresses
+                                ip_parts = addr['ip'].split(':')[-1].split('.')
+                                subnet = '.'.join(ip_parts[:2])
+                                subnet_groups[subnet].append(addr)
+                        except Exception as e:
+                            print(f"Error processing IP address: {addr}")
+                            continue
+                    
+                    suspicious_patterns = []
+                    
+                    for subnet, nodes in subnet_groups.items():
+                        if len(nodes) < 3:  # Need at least 3 nodes for meaningful analysis
+                            continue
+                        
+                        # Analyze timestamp patterns
+                        timestamps = []
+                        for node in nodes:
+                            try:
+                                dt = datetime.strptime(node['timestamp'], '%Y-%m-%d %H:%M:%S')
+                                timestamps.append(int(dt.timestamp()))
+                            except (ValueError, TypeError) as e:
+                                print(f"Error processing timestamp in subnet analysis: {node}")
+                                continue
+                        
+                        if len(timestamps) < 3:  # Skip if we don't have enough valid timestamps
+                            continue
+                            
+                        timestamps.sort()
+                        time_diffs = np.diff(timestamps)
+                        
+                        if len(time_diffs) > 0:
+                            mean_diff = np.mean(time_diffs)
+                            std_diff = np.std(time_diffs)
+                            
+                            # Check for suspiciously regular patterns
+                            if std_diff < mean_diff * 0.1:
+                                suspicious_patterns.append({
+                                    'subnet': subnet,
+                                    'node_count': len(nodes),
+                                    'mean_time_diff': mean_diff,
+                                    'std_diff': std_diff,
+                                    'nodes': nodes
+                                })
+                    
+                    # Print findings
+                    if suspicious_patterns:
+                        print("\nFound suspicious patterns that might indicate fingerprinting:")
+                        for pattern in suspicious_patterns:
+                            print(f"\nSubnet: {pattern['subnet']}")
+                            print(f"Node count: {pattern['node_count']}")
+                            print(f"Mean time difference: {pattern['mean_time_diff']:.2f} seconds")
+                            print(f"Time difference standard deviation: {pattern['std_diff']:.2f}")
+                            print("Sample nodes:")
+                            for node in pattern['nodes'][:3]:  # Show first 3 nodes
+                                print(f"  IP: {node['ip']}:{node['port']} Time: {node['timestamp']}")
+                    else:
+                        print("\nNo suspicious fingerprinting patterns detected")
+                    
+                    return suspicious_patterns
+                
+                
+                
+                def analyze_network_differences(samples):
+                    """Analyze differences between clearnet and Tor responses"""
+                    for sample in samples:
+                        clearnet_addrs = sample['clearnet']
+                        tor_addrs = sample['tor']
+                        
+                        print(f"\nAnalyzing sample from {sample['timestamp']}:")
+                        print(f"Clearnet addresses: {len(clearnet_addrs)}")
+                        print(f"Tor addresses: {len(tor_addrs)}")
+                        
+                        # Analyze each network separately
+                        print("\nClearnet Analysis:")
+                        analyze_timestamps(clearnet_addrs)
+                        detect_fingerprinting(clearnet_addrs)
+                        
+                        print("\nTor Analysis:")
+                        analyze_timestamps(tor_addrs)
+                        detect_fingerprinting(tor_addrs)
+                
+                def analyze_cross_network_correlations(clearnet_addrs, tor_addrs, time_threshold=300):
+                    """
+                    Compare addresses between clearnet and Tor to find correlations
+                    """
+                    print("\nAnalyzing cross-network correlations...")
+                    print(f"Comparing {len(clearnet_addrs)} clearnet addresses with {len(tor_addrs)} Tor addresses")
+                    
+                    # Store timestamps and services for both networks
+                    correlations = []
+                    
+                    for c_addr in clearnet_addrs:
+                        c_time = datetime.strptime(c_addr['timestamp'], '%Y-%m-%d %H:%M:%S')
+                        c_unix = int(c_time.timestamp())
+                        c_services = c_addr['services']
+                        
+                        for t_addr in tor_addrs:
+                            t_time = datetime.strptime(t_addr['timestamp'], '%Y-%m-%d %H:%M:%S')
+                            t_unix = int(t_time.timestamp())
+                            t_services = t_addr['services']
+                            
+                            # Check for similar timestamps and matching services
+                            if abs(c_unix - t_unix) <= time_threshold:
+                                correlations.append({
+                                    'clearnet_addr': c_addr,
+                                    'tor_addr': t_addr,
+                                    'time_difference': abs(c_unix - t_unix),
+                                    'services_match': c_services == t_services
+                                })
+                
+                    if correlations:
+                        print(f"\nFound {len(correlations)} cross-network correlations:")
+                        for corr in correlations:
+                            print(f"\nCorrelation:")
+                            print(f"Clearnet: {corr['clearnet_addr']['ip']}:{corr['clearnet_addr']['port']}")
+                            print(f"Tor: {corr['tor_addr']['ip']}:{corr['tor_addr']['port']}")
+                            print(f"Time difference: {corr['time_difference']} seconds")
+                            print(f"Services match: {corr['services_match']}")
+                            print(f"Clearnet services: {corr['clearnet_addr']['services']}")
+                            print(f"Tor services: {corr['tor_addr']['services']}")
+                    else:
+                        print("\nNo cross-network correlations found")
+                    
+                    return correlations
+                
+                if __name__ == "__main__":
+                    print("Starting data collection...")
+                    samples = collect_samples(delay_between=300, num_samples=3)
+                    
+                    all_correlations = []
+                    for sample in samples:
+                        print(f"\nAnalyzing sample from {sample['timestamp']}:")
+                        
+                        # Cross-network analysis
+                        correlations = analyze_cross_network_correlations(
+                            sample['clearnet'],
+                            sample['tor']
+                        )
+                        all_correlations.extend(correlations)
+                        
+                        # Individual network analysis
+                        analyze_network_differences(samples)
+                
+                    # Final summary
+                    print("\nFinal Analysis Summary:")
+                    print(f"Total samples analyzed: {len(samples)}")
+                    print(f"Total correlations found: {len(all_correlations)}")
+                    
+                    if all_correlations:
+                        matching_services = sum(1 for c in all_correlations if c['services_match'])
+                        print(f"Correlations with matching services: {matching_services}")
+                        avg_time_diff = sum(c['time_difference'] for c in all_correlations) / len(all_correlations)
+                        print(f"Average time difference: {avg_time_diff:.2f} seconds")
             </code>
         </pre>
     </div>
@@ -609,6 +731,43 @@ Analysis Summary:
 Total addresses analyzed: 253
 Correlated timestamp groups found: 0
 Suspicious fingerprinting patterns found: 0
+
+No suspicious timestamp correlations found
+
+Analyzing for potential fingerprinting patterns...
+
+No suspicious fingerprinting patterns detected
+
+Analyzing sample from 2024-12-03 15:36:47.778225:
+Clearnet addresses: 253
+Tor addresses: 0
+
+Clearnet Analysis:
+
+Analyzing 253 addresses for timestamp correlations...
+Using time threshold of 300 seconds
+
+No suspicious timestamp correlations found
+
+Analyzing for potential fingerprinting patterns...
+
+No suspicious fingerprinting patterns detected
+
+Tor Analysis:
+
+Analyzing 0 addresses for timestamp correlations...
+Using time threshold of 300 seconds
+
+No suspicious timestamp correlations found
+
+Analyzing for potential fingerprinting patterns...
+
+No suspicious fingerprinting patterns detected
+
+Final Analysis Summary:
+Total samples analyzed: 3
+Total correlations found: 0
+
 
         </code>
     </pre>
