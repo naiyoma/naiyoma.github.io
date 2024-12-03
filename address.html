@@ -35,6 +35,12 @@
             padding-top: 20px;
             border-top: 1px solid #eee;
         }
+        h4 {
+            color: #2c3e50;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
 
         h3 {
             color: #34495e;
@@ -119,12 +125,12 @@
        <div>
         <div class="container">
             <section class="section">
-                <h2>Current Implementation</h2>
+                <h4>Current Implementation</h4>
                 <p>This is a first iteration of this script focuses on the basic mechanism of data collection, without yet implementing Tor connectivity. The script demonstrates the fundamental aspects of the fingerprinting attack.</p>
             </section>
     
             <section class="section">
-                <h2>Script flow</h2>
+                <h4>Script flow</h4>
                 <ol class="ordered-list">
                     <li>Initiates connection to a victim node running on localhost</li>
                     <li>Establishes a  handshake connection</li>
@@ -140,12 +146,12 @@
             </section>
     
             <section class="section">
-                <h2>Current Observations</h2>
+                <h4>Current Observations</h4>
                 <p>The script successfully fetches peer data from the victim node. However, the retrieved IP addresses tend to remain relatively constant between requests, as nodes typically maintain a stable set of peer connections.</p>
             </section>
     
             <section class="section">
-                <h2>Limitations</h2>
+                <h4>Limitations</h4>
                 <ul>
                     <li>Currently only works with clearnet connections</li>
                     <li>Connects to localhost for testing</li>
@@ -154,7 +160,7 @@
             </section>
     
             <section class="section">
-                <h2>Next Steps</h2>
+                <h4>Next Steps</h4>
                 <ul>
                     <li>Implement Tor connection capabilities</li>
                     <li>Extend data collection over longer time periods</li>
@@ -350,7 +356,7 @@
         <section class="section">
             <pre>
                 <code>
-                    IP: ::ffff:2256:2036
+IP: ::ffff:2256:2036
 Time: 1984-08-08 16:29:04
 Services: 0x409674c
 
@@ -404,7 +410,7 @@ Total addresses received: 253
             Analyze timestamp Script
         </h3>
         <section class="section">
-            <h2>Script Flow</h2>
+            <h4>Script Flow</h4>
             <ul>
                 <li>collect timestamps from peer addresses received from the victim node</li>
                 <li> groups addresses based on timestamp proximity</li>
@@ -588,7 +594,7 @@ if __name__ == "__main__":
     <h4>Sample Output</h4>
     <pre>
         <code>
-            Received 253 addresses
+Received 253 addresses
 
 Analyzing 253 addresses for timestamp correlations...
 Using time threshold of 300 seconds
