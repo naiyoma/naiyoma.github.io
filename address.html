@@ -460,14 +460,17 @@
         <section class="section">
             <h4>Script Flow</h4>
             <ul>
-                <li>collect timestamps from peer addresses received from the victim node</li>
-                <li> groups addresses based on timestamp proximity</li>
+                <li>First we collect address clearnet address then tor addresses</li>
+                <li>Next we try and find a correlations between the samples collected from clearnet and those from Tor</li>
+                <li>This is very very simplistic but fist if a node has the same timestamp threshold and provides the same services i would want to categorize them :)</li>
+                <li>Check for similar timestamps and matching services</li>
                 <li> use a time threshold (300 seconds/5 minutes) to determine which timestamps are "close enough</li>
+                <li>So far i have not been able to find any correlations(I suspect my approach is too simplistic)</li>
             </ul>
             <p>
-                <h4>
-                    When timestamps from different addresses are very close together, it might indicate:
-                </h4>
+                <h5>
+                    My assumptions is When timestamps from different addresses are very close together, it might indicate:
+                </h5>
                 <li>
                     The addresses belong to the same node
                 </li>
@@ -737,57 +740,57 @@
     <h4>Sample Output</h4>
     <pre>
         <code>
-Received 253 addresses
+    Received 253 addresses
 
-Analyzing 253 addresses for timestamp correlations...
-Using time threshold of 300 seconds
+    Analyzing 253 addresses for timestamp correlations...
+    Using time threshold of 300 seconds
 
-No suspicious timestamp correlations found
+    No suspicious timestamp correlations found
 
-Analyzing for potential fingerprinting patterns...
+    Analyzing for potential fingerprinting patterns...
 
-No suspicious fingerprinting patterns detected
+    No suspicious fingerprinting patterns detected
 
-Analysis Summary:
-Total addresses analyzed: 253
-Correlated timestamp groups found: 0
-Suspicious fingerprinting patterns found: 0
+    Analysis Summary:
+    Total addresses analyzed: 253
+    Correlated timestamp groups found: 0
+    Suspicious fingerprinting patterns found: 0
 
-No suspicious timestamp correlations found
+    No suspicious timestamp correlations found
 
-Analyzing for potential fingerprinting patterns...
+    Analyzing for potential fingerprinting patterns...
 
-No suspicious fingerprinting patterns detected
+    No suspicious fingerprinting patterns detected
 
-Analyzing sample from 2024-12-03 15:36:47.778225:
-Clearnet addresses: 253
-Tor addresses: 0
+    Analyzing sample from 2024-12-03 15:36:47.778225:
+    Clearnet addresses: 253
+    Tor addresses: 0
 
-Clearnet Analysis:
+    Clearnet Analysis:
 
-Analyzing 253 addresses for timestamp correlations...
-Using time threshold of 300 seconds
+    Analyzing 253 addresses for timestamp correlations...
+    Using time threshold of 300 seconds
 
-No suspicious timestamp correlations found
+    No suspicious timestamp correlations found
 
-Analyzing for potential fingerprinting patterns...
+    Analyzing for potential fingerprinting patterns...
 
-No suspicious fingerprinting patterns detected
+    No suspicious fingerprinting patterns detected
 
-Tor Analysis:
+    Tor Analysis:
 
-Analyzing 0 addresses for timestamp correlations...
-Using time threshold of 300 seconds
+    Analyzing 0 addresses for timestamp correlations...
+    Using time threshold of 300 seconds
 
-No suspicious timestamp correlations found
+    No suspicious timestamp correlations found
 
-Analyzing for potential fingerprinting patterns...
+    Analyzing for potential fingerprinting patterns...
 
-No suspicious fingerprinting patterns detected
+    No suspicious fingerprinting patterns detected
 
-Final Analysis Summary:
-Total samples analyzed: 3
-Total correlations found: 0
+    Final Analysis Summary:
+    Total samples analyzed: 3
+    Total correlations found: 0
 
         </code>
     </pre>
