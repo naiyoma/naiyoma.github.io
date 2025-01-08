@@ -144,73 +144,13 @@
                 </ol>
             </section>
     
-            <section class="section">
-                <h4>Current Observations</h4>
-                <p>Find exact same timestamps between 3 different sets of peers </p>
-            </section>
-    
-            <section class="section">
-            </section>
-    
-            <section class="section">
-                <h4></h4>
-                <ul>
-                    <code><li>create_connection (creates a socket connection to my local node)</li></code>
-                    <li><code>create_message</code> (Defines Version Message details and then create version message using the payload) and send the message via our socket</li>
-                    <li>wait a few seconds for a response from local connection</li>
-                    <li>Decode the data thats being returned, we want ti=o check the command thats being sent as part of the response(since we had sent a version message we should get a verack message )</li>
-                    <li>After getting a verack message we send a getaddr request and wait for the response and this completes the handshake process</li>
-                    <li>Finally we get addr message and decode the response to get, addresses, timestamp and services </li>
-                    <p>This goes on until we have no new new_addresses </p>
-                    <p> I wanted to collect as much data from both connections (tor and clearnet) as possible </p>
-                    <p>My observation is that both clearnet and tor return the same addresses over and over, the range from the count is constantly between 253 and 260 even after running the script multiple times</p>
-                </ul>
-            </section>
         </div>
        </div>
 
-        <img src="peer_analysis_plots.png" alt="First image">
+       
         <pre>
         <code>
-            <py-script>
-                python3 getaddresses2.py                                                                                                                                    
-                                                                                                                                                                                        
-                Peer 2 Analysis:                                                                                                                                                                        
-                Total addresses: 1014                                                                                                                                                                   
-                - Onion: 229                                                                                                                                                                            
-                - Clearnet: 785                                                                                                                                                                         
-                Timestamp matches: 0                                                                                                                                                                    
-                                                                                                                                                                                                        
-                Peer 4 Analysis:                                                                                                                                                                        
-                Total addresses: 1002                                                                                                                                                                   
-                - Onion: 180                                                                                                                                                                            
-                - Clearnet: 822                                                                                                                                                                         
-                Timestamp matches: 1                                                                                                                                                                    
-                                                                                                                                                                                                        
-                Matched timestamps:                                                                                                                                                                     
-                                                                                                                                                                                                        
-                Timestamp 1736173250:                                                                                                                                                                   
-                Onion addresses:                                                                                                                                                                        
-                  - gqgystkvdeqdepuk5cspf7yxcxrl3yfjuyjdrqlhbl2ce7oj3vs5ynad.onion:8333                                                                                                                 
-                Clearnet addresses:                                                                                                                                                                     
-                  - 93.189.31.80:8333                                                                                                                                                                   
-                                                                                                                                                                                                        
-                Peer 3 Analysis:                                                                                                                                                                        
-                Total addresses: 1017                                                                                                                                                                   
-                - Onion: 201                                                                                                                                                                            
-                - Clearnet: 816                                                                                                                                                                         
-                Timestamp matches: 1                                                                                                                                                                    
-                                                                                                                                                                                                        
-                Matched timestamps:                                                                                                                                                                     
-                                                                                                                                                                                                        
-                Timestamp 1736230456:                                                                                                                                                                   
-                Onion addresses:                                                                                                                                                                        
-                  - obtqb3wgaogig3babkkqkl44lebiuwrmrhuam6ido42evsockvth5gad.onion:8333                                                                                                                 
-                Clearnet addresses:                                                                                                                                                                     
-                  - 120.202.91.205:8333                                                                                                                                                                 
-                                                                        
-
-            </py-script>               
+              
         </code>
         </pre>
         <h4>Output from script above </h4>
@@ -361,5 +301,7 @@
         <div>
             <a href="aaproach2.html"></a>
         </div>
+
+        <img src="Screenshot from 2025-01-08 14-17-11.png" alt="First image">
 </body>
 </html>
