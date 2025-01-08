@@ -132,18 +132,16 @@
             <section class="section">
                 <h4>Script flow</h4>
                 <ol class="ordered-list">
-                    <li>Run my own local node (on tor and clearnet)</li>
-                    <li>Log Addresses that i receive from different peers </li>
+                    <li>Run my own local node (Enable both Tor and clearnet network connections).</li>
+                    <li>Monitor and log addresses received from connected peers.</li>
                     <li>Each peer returns around 1000 Ip Addresses</li>
-                    <li>Scrapes and analyze:
+                    <li>Scrapes and analyze timestamps within the same peer:
                         <ul class="sub-list">
-                            <li>IP addresses</li>
-                            <li>Timestamps</li>
+                            <li>Compare timestamps between Tor and clearnet addresses within the same peer responses and identifying matching Timestamps</li>
                         </ul>
                     </li>
                 </ol>
             </section>
-    
         </div>
        </div>
         <h4>Output from script above </h4>
@@ -272,22 +270,22 @@
             <h4>
                 Analysis Summary:
             </h4>
-            <h6>
+            <h5>
                 Total peers analyzed: 10
-            </h6>
-            <h6>
+            </h5>
+            <h5>
                 Average onion addresses per peer: 394.80
-            </h6>
-            <h6>
+            </h5>
+            <h5>
                 Average clearnet addresses per peer: 615.70
-            </h6>
-            <h6>
+            </h5>
+            <h5>
                 Average timestamp matches per peer: 0.60
-            </h6>
-            <h6>
+            </h5>
+            <h5>
                 Average match ratio: 0.29%
-            </h6>
-            <h6>Top 3 peers by match ratio:</h6>
+            </h5>
+            <h5>Top 3 peers by match ratio:</h5>
             <li>Peer 18: 1.36%</li>
             <li>Peer 4: 0.56%</li>
             <li>Peer 3: 0.50%</li>
